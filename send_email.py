@@ -18,7 +18,7 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 EMAIL_USER = os.getenv("EMAIL_USER")
 print("DEBUG:", EMAIL_USER, bool(SMTP_PASSWORD))
 
-#RESOURCES_DIR = "resources"
+#RESOURCES_DIR = "D:/aiprojects/resources"
 RESOURCES_DIR = "/home/kumaresh/resources"
 
 # --- Step 1: Normalize function (common use) ---

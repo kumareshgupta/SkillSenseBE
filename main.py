@@ -1,9 +1,19 @@
 # backend/main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pathlib import Path
+import os
+import re
 from pydantic import BaseModel
-from send_email import send_skill_email
+from send_email import send_skill_email, build_pdf_lookup, normalize
 from db_handler import init_db, insert_participant
+from datetime import datetime
+
+#LOG_DIR = Path("D:/aiprojects/logs") 
+LOG_FILE = Path("/home/kumaresh/logs/course_access.log")  # Use your Linux path if needed
+
+#LOG_FILE = Path("D:/aiprojects/logs/course_access.log")  # file will be created in backend folder
 
 app = FastAPI()
 
@@ -27,6 +37,13 @@ class Learner(BaseModel):
     experience: str
     current_skill: str
     wish_to_upskill: list[str]
+
+def log_course_access(course_name: str, status: str):
+    timestamp = datetime.now().strftime("%d-%m-%Y- %H:%M:%S")
+    log_entry = f"{timestamp} | {course_name} | {status}\n"
+    with open(LOG_FILE, "a") as f:
+        f.write(log_entry)
+
 
 @app.post("/submit")
 async def submit_form(data: Learner):
@@ -54,3 +71,32 @@ async def submit_form(data: Learner):
             "status": "error",
             "message": f"Email could not be sent. Error: {str(e)}"
         }
+
+
+# ------------------------------
+# Catalogue PDF Serving
+# ------------------------------
+#RESOURCE_DIR = Path("D:/aiprojects/resources")  # Same as send_email.py
+RESOURCE_DIR = Path("/home/kumaresh/resources")  # Use your Linux path if needed
+
+
+
+# Build lookup for PDFs (key=normalized course name, value=filename)
+pdf_lookup = build_pdf_lookup(RESOURCE_DIR)
+
+@app.get("/course-pdf")
+def get_course_pdf(course: str):
+    course_key = normalize(course)
+    filename = pdf_lookup.get(course_key)
+    if not filename:
+        raise HTTPException(status_code=404, detail="Course PDF not found")
+    
+    file_path = RESOURCE_DIR / filename
+    if not file_path.exists():
+        log_course_access(course, "File missing")
+        raise HTTPException(status_code=404, detail="PDF file missing on server")
+
+      #  Log the access to the course
+    log_course_access(course, "success")
+    
+    return FileResponse(file_path, media_type="application/pdf")
